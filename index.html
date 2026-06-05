@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Приглашение на прогулку — указать @username</title>
+    <title>Приглашение на прогулку — только @username</title>
     <style>
         * {
             box-sizing: border-box;
@@ -200,6 +200,15 @@
             margin-top: 30px;
             padding: 10px 32px;
         }
+
+        .error-message {
+            color: #d32f2f;
+            font-size: 0.85rem;
+            margin-top: 10px;
+            background: #ffebee;
+            padding: 8px;
+            border-radius: 30px;
+        }
     </style>
 </head>
 <body>
@@ -209,46 +218,70 @@
     // ---------- TELEGRAM БОТ ----------
     const BOT_TOKEN = "8722343257:AAGfsw-ihKSzRtuO4Yyh1P7I8vk6CRF3qQ0";
     
-    // Переменная для хранения юзернейма или ID получателя
-    let targetRecipient = "";
+    // Переменная для хранения username получателя (ТОЛЬКО С @)
+    let targetUsername = "";
     
-    // Функция отправки сообщения (работает и с @username, и с числовым ID)
-    function sendToTelegram(text, recipient) {
-        if (!recipient) {
-            console.error("Нет получателя");
-            return;
+    // Функция отправки сообщения ТОЛЬКО на username
+    function sendToTelegramByUsername(text, username) {
+        if (!username) {
+            console.error("Нет username получателя");
+            return false;
         }
         
-        let chatId = recipient;
-        // Если recipient начинается с @, оставляем как есть (это username)
-        // Если это число (или строка из цифр) — тоже подойдёт
+        // Убираем лишние @ если есть, потом добавляем один
+        let cleanUsername = username.replace(/^@+/, "");
+        if (cleanUsername.length < 1) {
+            console.error("Некорректный username");
+            return false;
+        }
+        
+        const chatIdentifier = `@${cleanUsername}`;
+        console.log("Отправка на username:", chatIdentifier);
         
         fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ 
-                chat_id: chatId, 
+                chat_id: chatIdentifier, 
                 text: text, 
                 parse_mode: "HTML" 
             })
-        }).then(response => response.json())
-          .then(data => {
-              if (!data.ok) {
-                  console.error("Ошибка отправки:", data.description);
-              } else {
-                  console.log("Сообщение отправлено:", text.substring(0, 50));
-              }
-          })
-          .catch(e => console.log("Ошибка сети:", e));
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.ok) {
+                console.error("Ошибка отправки:", data.description);
+                // Показываем ошибку пользователю, если возможно
+                const errorDiv = document.getElementById('sendError');
+                if (errorDiv) {
+                    errorDiv.innerText = `❌ Ошибка: ${data.description}. Убедитесь, что пользователь @${cleanUsername} написал боту /start`;
+                    errorDiv.style.display = "block";
+                }
+            } else {
+                console.log("✅ Сообщение отправлено юзернейму", username);
+                const errorDiv = document.getElementById('sendError');
+                if (errorDiv) errorDiv.style.display = "none";
+            }
+        })
+        .catch(e => {
+            console.error("Ошибка сети:", e);
+            const errorDiv = document.getElementById('sendError');
+            if (errorDiv) {
+                errorDiv.innerText = `❌ Ошибка сети: ${e.message}`;
+                errorDiv.style.display = "block";
+            }
+        });
+        
+        return true;
     }
     
-    // Обёртка для отправки текущему получателю
+    // Обёртка для отправки текущему username (только @username)
     function sendToTarget(text) {
-        if (!targetRecipient) {
-            console.warn("Не указан получатель");
+        if (!targetUsername) {
+            console.warn("Не указан username получателя");
             return;
         }
-        sendToTelegram(text, targetRecipient);
+        sendToTelegramByUsername(text, targetUsername);
     }
 
     // ---------- КАЛЕНДАРЬ 2026 ----------
@@ -320,21 +353,28 @@
     }
 
     function render() {
-        // ЭКРАН 0: ВВОД ПОЛУЧАТЕЛЯ (username или ID)
+        // ЭКРАН 0: ВВОД USERNAME (только @username или без @)
         if (currentState === 'askUsername') {
             root.innerHTML = `
                 <div class="big-question">📨 Кому отправить результаты?</div>
-                <div style="font-size:1.2rem; margin-bottom:10px;">Введите Telegram @username или ID получателя</div>
-                <input type="text" id="targetUserInput" class="input-field" placeholder="например: @durov или 123456789" autocomplete="off">
+                <div style="font-size:1.2rem; margin-bottom:10px;">Введите Telegram @username получателя</div>
+                <input type="text" id="targetUserInput" class="input-field" placeholder="@username" autocomplete="off">
                 <button class="btn send-btn" id="saveUsernameBtn">✅ Сохранить</button>
+                <div id="sendError" class="error-message" style="display:none;"></div>
             `;
             document.getElementById('saveUsernameBtn')?.addEventListener('click', () => {
                 let rawInput = document.getElementById('targetUserInput')?.value.trim();
                 if (!rawInput) {
-                    alert("Пожалуйста, введите @username или ID");
+                    alert("Пожалуйста, введите @username получателя");
                     return;
                 }
-                targetRecipient = rawInput;
+                // Убираем лишние символы, оставляем только username
+                let clean = rawInput.replace(/^@+/, "");
+                if (clean.length < 1) {
+                    alert("Введите корректный username");
+                    return;
+                }
+                targetUsername = "@" + clean;
                 currentState = 'askWalk';
                 render();
             });
@@ -347,6 +387,7 @@
                     <button class="btn btn-yes" id="yesWalkBtn">✅ ДА</button>
                     <button class="btn btn-no" id="escapeNoBtn">❌ НЕТ</button>
                 </div>
+                <div id="sendError" class="error-message" style="display:none;"></div>
             `;
             attachSuperFastEscape();
             document.getElementById('yesWalkBtn')?.addEventListener('click', () => {
@@ -360,12 +401,13 @@
                 <div class="big-question">🗺️ куда бы ты хотел сходить?</div>
                 <input type="text" id="placeInput" class="input-field" placeholder="Напиши место..." autocomplete="off">
                 <button class="btn send-btn" id="sendPlaceBtn">Отправить</button>
+                <div id="sendError" class="error-message" style="display:none;"></div>
             `;
             document.getElementById('sendPlaceBtn')?.addEventListener('click', () => {
                 const place = document.getElementById('placeInput')?.value.trim();
                 if (!place) { alert("Напиши место :)"); return; }
                 savedPlace = place;
-                sendToTarget(`📍 Желаемое место прогулки: ${place}`);
+                sendToTarget(`📍 Место прогулки: ${place}`);
                 currentState = 'calendarDatePick';
                 render();
             });
@@ -385,6 +427,7 @@
                     ${calendarHtml}
                 </div>
                 <div style="margin-top:10px;">кликни на любой день</div>
+                <div id="sendError" class="error-message" style="display:none;"></div>
             `;
             document.getElementById('prevMonth')?.addEventListener('click', () => { if (currentMonthIndex > 0) currentMonthIndex--; render(); });
             document.getElementById('nextMonth')?.addEventListener('click', () => { if (currentMonthIndex < months2026.length-1) currentMonthIndex++; render(); });
@@ -415,6 +458,7 @@
                         <button class="small-btn" id="confirmNoBtn">🔁 Выбрать заново</button>
                     </div>
                 </div>
+                <div id="sendError" class="error-message" style="display:none;"></div>
             `;
             document.getElementById('confirmYesBtn')?.addEventListener('click', () => {
                 selectedDateObj = tempSelectedDate;
@@ -433,6 +477,7 @@
                 <div class="big-question">🤔 что будем делать?</div>
                 <input type="text" id="activityInput" class="input-field" placeholder="Напиши активность / занятие..." autocomplete="off">
                 <button class="btn send-btn" id="sendActivityBtn">Отправить</button>
+                <div id="sendError" class="error-message" style="display:none;"></div>
             `;
             document.getElementById('sendActivityBtn')?.addEventListener('click', () => {
                 const activity = document.getElementById('activityInput')?.value.trim();
@@ -448,6 +493,7 @@
                 <div class="thanks">✨ спасибо что пользуетесь нашими услугами! ✨</div>
                 <div style="margin-top:30px; font-size:1.2rem;">❤️‍🔥 Ждём встречи!</div>
                 <button class="small-btn close-btn" id="closeAppBtn">❌ Закрыть</button>
+                <div id="sendError" class="error-message" style="display:none;"></div>
             `;
             document.getElementById('closeAppBtn')?.addEventListener('click', () => {
                 window.close(); 
