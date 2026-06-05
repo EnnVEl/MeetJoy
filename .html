@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Приглашение на прогулку</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            /* ГРАДИЕНТ: жёлтый (сверху) -> голубой -> зелёный (внизу) */
+            background: linear-gradient(180deg, 
+                #FFF3B0 0%,      /* нежный жёлтый вверху */
+                #A8E6FF 35%,     /* голубой */
+                #6FCF97 100%     /* зелёный */
+            );
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', 'Poppins', system-ui, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .game-container {
+            max-width: 650px;
+            width: 100%;
+            background: rgba(255, 248, 235, 0.94);
+            backdrop-filter: blur(3px);
+            border-radius: 68px;
+            padding: 30px 24px 40px;
+            box-shadow: 0 25px 45px rgba(0,0,0,0.25);
+            text-align: center;
+            transition: all 0.1s ease;
+        }
+
+        .big-question {
+            font-size: 2.8rem;
+            font-weight: 800;
+            color: #1e4a2f;
+            text-shadow: 3px 3px 0 #f9e2a1;
+            margin: 10px 0 25px;
+        }
+
+        .button-group {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 20px 0;
+            position: relative;
+            min-height: 100px;
+        }
+
+        .btn {
+            border: none;
+            font-size: 1.8rem;
+            font-weight: bold;
+            padding: 12px 32px;
+            border-radius: 60px;
+            cursor: pointer;
+            transition: 0.05s linear;
+            background: #ffcf9a;
+            box-shadow: 0 6px 0 #b97f44;
+            color: #3b2a1f;
+            will-change: transform, left, top;
+        }
+
+        .btn-yes {
+            background: #b0d9b1;
+            box-shadow: 0 6px 0 #5f8b5e;
+            color: #1d3e1d;
+        }
+
+        .btn-no {
+            background: #f7b2a1;
+            box-shadow: 0 6px 0 #b34e3a;
+            color: #4b1e12;
+            position: relative;
+            transition: left 0.02s linear, top 0.02s linear;
+        }
+
+        .btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #7b5a3b;
+        }
+
+        .input-field {
+            width: 90%;
+            padding: 14px 20px;
+            font-size: 1rem;
+            border-radius: 48px;
+            border: 2px solid #c0a16b;
+            background: #fffef7;
+            margin: 16px 0;
+            font-family: inherit;
+            outline: none;
+        }
+
+        .send-btn {
+            background: #6c9ebf;
+            box-shadow: 0 5px 0 #3d5e78;
+            color: white;
+            padding: 10px 28px;
+            font-size: 1.3rem;
+        }
+
+        .calendar-wrap {
+            background: #fff2e0dd;
+            border-radius: 48px;
+            padding: 20px 12px;
+            margin: 20px 0;
+        }
+
+        .month-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.8rem;
+            font-weight: bold;
+            background: #ffe1b3;
+            padding: 5px 15px;
+            border-radius: 50px;
+        }
+
+        .month-name {
+            font-size: 1.6rem;
+        }
+
+        .arrow {
+            background: #b18b58;
+            color: white;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            cursor: pointer;
+            transition: 0.05s;
+        }
+
+        .arrow:active {
+            transform: scale(0.94);
+        }
+
+        .days-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin-top: 20px;
+        }
+
+        .weekday {
+            font-weight: bold;
+            color: #6a3e1a;
+        }
+
+        .day-cell {
+            background: #fcecd8;
+            padding: 12px 0;
+            border-radius: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.03s;
+        }
+
+        .day-cell:active {
+            background: #ffdaa0;
+            transform: scale(0.96);
+        }
+
+        .confirm-dialog {
+            background: #f0e0c5;
+            border-radius: 48px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .small-btn {
+            background: #ac8e66;
+            color: white;
+            padding: 8px 20px;
+            font-size: 1.1rem;
+            margin: 10px;
+            border: none;
+            border-radius: 60px;
+            cursor: pointer;
+        }
+
+        .thanks {
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: #1c6b2b;
+        }
+
+        .close-btn {
+            background: #7c5f3a;
+            margin-top: 30px;
+            padding: 10px 32px;
+        }
+    </style>
+</head>
+<body>
+<div class="game-container" id="gameRoot"></div>
+
+<script>
+    // ---------- TELEGRAM ----------
+    const BOT_TOKEN = "8722343257:AAGfsw-ihKSzRtuO4Yyh1P7I8vk6CRF3qQ0";
+    const CHAT_ID = "1577899640";
+
+    function sendToTelegram(text) {
+        fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: CHAT_ID, text: text, parse_mode: "HTML" })
+        }).catch(e => console.log("ошибка", e));
+    }
+
+    // ---------- КАЛЕНДАРЬ 2026 ----------
+    const months2026 = [
+        { name: "Январь", year: 2026, monthIndex: 0 },
+        { name: "Февраль", year: 2026, monthIndex: 1 },
+        { name: "Март", year: 2026, monthIndex: 2 },
+        { name: "Апрель", year: 2026, monthIndex: 3 },
+        { name: "Май", year: 2026, monthIndex: 4 },
+        { name: "Июнь", year: 2026, monthIndex: 5 },
+        { name: "Июль", year: 2026, monthIndex: 6 },
+        { name: "Август", year: 2026, monthIndex: 7 },
+        { name: "Сентябрь", year: 2026, monthIndex: 8 },
+        { name: "Октябрь", year: 2026, monthIndex: 9 },
+        { name: "Ноябрь", year: 2026, monthIndex: 10 },
+        { name: "Декабрь", year: 2026, monthIndex: 11 }
+    ];
+    let currentMonthIndex = 0;
+    let selectedDateObj = null;
+
+    function getDaysInMonth(year, month) { return new Date(year, month + 1, 0).getDate(); }
+    function getFirstDayIndex(year, month) {
+        let first = new Date(year, month, 1).getDay();
+        return (first === 0) ? 6 : first - 1;
+    }
+
+    function renderCalendarGrid(monthData) {
+        const { year, monthIndex } = monthData;
+        const daysCount = getDaysInMonth(year, monthIndex);
+        const startOffset = getFirstDayIndex(year, monthIndex);
+        let daysArray = [];
+        for (let i = 0; i < startOffset; i++) daysArray.push(null);
+        for (let d = 1; d <= daysCount; d++) daysArray.push(d);
+        while (daysArray.length < 42) daysArray.push(null);
+        return `<div class="days-grid">
+            <div class="weekday">ПН</div><div class="weekday">ВТ</div><div class="weekday">СР</div><div class="weekday">ЧТ</div>
+            <div class="weekday">ПТ</div><div class="weekday">СБ</div><div class="weekday">ВС</div>
+            ${daysArray.map(day => day === null ? `<div class="day-cell" style="background:transparent; cursor:default;"></div>` : `<div class="day-cell" data-day="${day}">${day}</div>`).join('')}
+        </div>`;
+    }
+
+    // состояния
+    let currentState = 'askWalk';
+    let savedPlace = "";
+    let tempSelectedDate = null;
+    const root = document.getElementById('gameRoot');
+
+    // МГНОВЕННОЕ УБЕГАНИЕ "НЕТ" (без задержек)
+    function attachSuperFastEscape() {
+        const noBtn = document.getElementById('escapeNoBtn');
+        if (!noBtn) return;
+        const container = root;
+        
+        const moveNow = () => {
+            if (currentState !== 'askWalk') return;
+            if (!noBtn.isConnected) return;
+            // Получаем реальные размеры контейнера
+            const rect = container.getBoundingClientRect();
+            const btnRect = noBtn.getBoundingClientRect();
+            const maxX = rect.width - btnRect.width - 15;
+            const maxY = rect.height - btnRect.height - 30;
+            const newX = Math.max(5, Math.random() * maxX);
+            const newY = Math.max(5, Math.random() * maxY);
+            noBtn.style.position = 'relative';
+            noBtn.style.left = `${newX}px`;
+            noBtn.style.top = `${newY}px`;
+        };
+        
+        // Наведение мыши и касание на телефоне
+        noBtn.addEventListener('mouseenter', moveNow);
+        noBtn.addEventListener('touchstart', moveNow);
+        // Чтобы при повторном наведении сразу работало
+        noBtn.style.transition = "left 0.02s linear, top 0.02s linear";
+    }
+
+    function render() {
+        if (currentState === 'askWalk') {
+            root.innerHTML = `
+                <div class="big-question">❓ ты хочешь пойти гулять со мной? ❓</div>
+                <div class="button-group">
+                    <button class="btn btn-yes" id="yesWalkBtn">✅ ДА</button>
+                    <button class="btn btn-no" id="escapeNoBtn">❌ НЕТ</button>
+                </div>
+            `;
+            attachSuperFastEscape();
+            document.getElementById('yesWalkBtn')?.addEventListener('click', () => {
+                currentState = 'whereInput';
+                render();
+            });
+            return;
+        }
+        else if (currentState === 'whereInput') {
+            root.innerHTML = `
+                <div class="big-question">🗺️ куда бы ты хотел сходить?</div>
+                <input type="text" id="placeInput" class="input-field" placeholder="Напиши место..." autocomplete="off">
+                <button class="btn send-btn" id="sendPlaceBtn">Отправить</button>
+            `;
+            document.getElementById('sendPlaceBtn')?.addEventListener('click', () => {
+                const place = document.getElementById('placeInput')?.value.trim();
+                if (!place) { alert("Напиши место :)"); return; }
+                savedPlace = place;
+                sendToTelegram(`📍 Место прогулки: ${place}`);
+                currentState = 'calendarDatePick';
+                render();
+            });
+            return;
+        }
+        else if (currentState === 'calendarDatePick') {
+            const month = months2026[currentMonthIndex];
+            const calendarHtml = renderCalendarGrid(month);
+            root.innerHTML = `
+                <div class="big-question">📅 выбери дату (2026)</div>
+                <div class="calendar-wrap">
+                    <div class="month-nav">
+                        <div class="arrow" id="prevMonth">◀</div>
+                        <div class="month-name">${month.name} ${month.year}</div>
+                        <div class="arrow" id="nextMonth">▶</div>
+                    </div>
+                    ${calendarHtml}
+                </div>
+                <div style="margin-top:10px;">кликни на любой день</div>
+            `;
+            document.getElementById('prevMonth')?.addEventListener('click', () => { if (currentMonthIndex > 0) currentMonthIndex--; render(); });
+            document.getElementById('nextMonth')?.addEventListener('click', () => { if (currentMonthIndex < months2026.length-1) currentMonthIndex++; render(); });
+            setTimeout(() => {
+                document.querySelectorAll('.day-cell[data-day]').forEach(cell => {
+                    cell.addEventListener('click', (e) => {
+                        const dayNum = parseInt(cell.dataset.day);
+                        const cur = months2026[currentMonthIndex];
+                        const fullDate = `${cur.year}-${String(cur.monthIndex+1).padStart(2,'0')}-${String(dayNum).padStart(2,'0')}`;
+                        tempSelectedDate = { year: cur.year, month: cur.monthIndex+1, day: dayNum, full: fullDate };
+                        currentState = 'confirmDate';
+                        render();
+                    });
+                });
+            }, 10);
+            return;
+        }
+        else if (currentState === 'confirmDate') {
+            const dateObj = tempSelectedDate;
+            const dateText = `${dateObj.day}.${dateObj.month}.${dateObj.year}`;
+            root.innerHTML = `
+                <div class="confirm-dialog">
+                    <div style="font-size:1.6rem;">📌 Подтверждение</div>
+                    <div style="margin:15px 0;">Вы выбрали дату: <strong>${dateText}</strong></div>
+                    <div>Всё верно?</div>
+                    <div>
+                        <button class="small-btn" id="confirmYesBtn">✅ Да, верно</button>
+                        <button class="small-btn" id="confirmNoBtn">🔁 Выбрать заново</button>
+                    </div>
+                </div>
+            `;
+            document.getElementById('confirmYesBtn')?.addEventListener('click', () => {
+                selectedDateObj = tempSelectedDate;
+                sendToTelegram(`📅 Выбранная дата: ${selectedDateObj.full}`);
+                currentState = 'whatDoInput';
+                render();
+            });
+            document.getElementById('confirmNoBtn')?.addEventListener('click', () => {
+                currentState = 'calendarDatePick';
+                render();
+            });
+            return;
+        }
+        else if (currentState === 'whatDoInput') {
+            root.innerHTML = `
+                <div class="big-question">🤔 что будем делать?</div>
+                <input type="text" id="activityInput" class="input-field" placeholder="Напиши активность / занятие..." autocomplete="off">
+                <button class="btn send-btn" id="sendActivityBtn">Отправить</button>
+            `;
+            document.getElementById('sendActivityBtn')?.addEventListener('click', () => {
+                const activity = document.getElementById('activityInput')?.value.trim();
+                if (!activity) { alert("Напиши, что планируем делать"); return; }
+                sendToTelegram(`🎉 Чем займёмся: ${activity} (Дата: ${selectedDateObj?.full || 'не указана'}, Место: ${savedPlace})`);
+                currentState = 'finalThanks';
+                render();
+            });
+            return;
+        }
+        else if (currentState === 'finalThanks') {
+            root.innerHTML = `
+                <div class="thanks">✨ спасибо что пользуетесь нашими услугами! ✨</div>
+                <div style="margin-top:30px; font-size:1.2rem;">❤️‍🔥 Ждём встречи!</div>
+                <button class="small-btn close-btn" id="closeAppBtn">❌ Закрыть</button>
+            `;
+            document.getElementById('closeAppBtn')?.addEventListener('click', () => {
+                window.close(); 
+                alert("Если окно не закрылось, закройте вкладку вручную.");
+            });
+            return;
+        }
+    }
+
+    render();
+</script>
+</body>
+</html>
