@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Приглашение на прогулку</title>
+    <title>Приглашение на прогулку — указать @username</title>
     <style>
         * {
             box-sizing: border-box;
@@ -11,12 +11,10 @@
         }
 
         body {
-            /* ГРАДИЕНТ: жёлтый (сверху) -> голубой -> зелёный (внизу) */
             background: linear-gradient(180deg, 
-                #FFF3B0 0%,      /* нежный жёлтый вверху */
-                #A8E6FF 35%,     /* голубой */
-                #6FCF97 100%     /* зелёный */
-            );
+                #FFF3B0 0%, 
+                #A8E6FF 35%, 
+                #6FCF97 100%);
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -35,7 +33,6 @@
             padding: 30px 24px 40px;
             box-shadow: 0 25px 45px rgba(0,0,0,0.25);
             text-align: center;
-            transition: all 0.1s ease;
         }
 
         .big-question {
@@ -203,24 +200,53 @@
             margin-top: 30px;
             padding: 10px 32px;
         }
+
+        .warning-text {
+            font-size: 0.8rem;
+            color: #b45f2b;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
 <div class="game-container" id="gameRoot"></div>
 
 <script>
-    // ---------- TELEGRAM ----------
+    // ---------- TELEGRAM БОТ ----------
     const BOT_TOKEN = "8722343257:AAGfsw-ihKSzRtuO4Yyh1P7I8vk6CRF3qQ0";
-    const CHAT_ID = "1577899640";
-
-    function sendToTelegram(text) {
+    
+    // Переменная для хранения юзернейма получателя (с @)
+    let targetUsername = "";
+    
+    // Функция отправки сообщения по @username
+    function sendToTelegramByUsername(text, username) {
+        if (!username) {
+            console.error("Нет username получателя");
+            return;
+        }
+        // Убираем @ если вдруг уже есть, потом добавим один
+        let cleanUsername = username.replace(/^@/, "");
+        const chatIdentifier = `@${cleanUsername}`;
+        
         fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ chat_id: CHAT_ID, text: text, parse_mode: "HTML" })
-        }).catch(e => console.log("ошибка", e));
+            body: JSON.stringify({ 
+                chat_id: chatIdentifier, 
+                text: text, 
+                parse_mode: "HTML" 
+            })
+        }).catch(e => console.log("Ошибка отправки username:", e));
     }
     
+    // Обёртка, которая использует глобальный targetUsername
+    function sendToTarget(text) {
+        if (!targetUsername) {
+            console.warn("Не указан получатель");
+            return;
+        }
+        sendToTelegramByUsername(text, targetUsername);
+    }
 
     // ---------- КАЛЕНДАРЬ 2026 ----------
     const months2026 = [
@@ -262,41 +288,64 @@
     }
 
     // состояния
-    let currentState = 'askWalk';
+    let currentState = 'askUsername'; // НАЧАЛЬНОЕ: спрашиваем юзернейм
     let savedPlace = "";
     let tempSelectedDate = null;
     const root = document.getElementById('gameRoot');
 
-    // МГНОВЕННОЕ УБЕГАНИЕ "НЕТ" (без задержек)
+    // МГНОВЕННОЕ УБЕГАНИЕ "НЕТ"
     function attachSuperFastEscape() {
         const noBtn = document.getElementById('escapeNoBtn');
         if (!noBtn) return;
         const container = root;
-        
         const moveNow = () => {
             if (currentState !== 'askWalk') return;
             if (!noBtn.isConnected) return;
-            // Получаем реальные размеры контейнера
             const rect = container.getBoundingClientRect();
             const btnRect = noBtn.getBoundingClientRect();
-            const maxX = rect.width - btnRect.width - 15;
-            const maxY = rect.height - btnRect.height - 30;
-            const newX = Math.max(5, Math.random() * maxX);
-            const newY = Math.max(5, Math.random() * maxY);
+            const maxX = Math.max(10, rect.width - btnRect.width - 15);
+            const maxY = Math.max(10, rect.height - btnRect.height - 30);
+            const newX = Math.random() * maxX;
+            const newY = Math.random() * maxY;
             noBtn.style.position = 'relative';
             noBtn.style.left = `${newX}px`;
             noBtn.style.top = `${newY}px`;
         };
-        
-        // Наведение мыши и касание на телефоне
         noBtn.addEventListener('mouseenter', moveNow);
         noBtn.addEventListener('touchstart', moveNow);
-        // Чтобы при повторном наведении сразу работало
         noBtn.style.transition = "left 0.02s linear, top 0.02s linear";
     }
 
     function render() {
-        if (currentState === 'askWalk') {
+        // ЭКРАН 0: ВВОД ЮЗЕРНЕЙМА ПОЛУЧАТЕЛЯ
+        if (currentState === 'askUsername') {
+            root.innerHTML = `
+                <div class="big-question">📨 Кому отправить результаты?</div>
+                <div style="font-size:1.2rem; margin-bottom:10px;">Введите Telegram @username получателя</div>
+                <input type="text" id="targetUserInput" class="input-field" placeholder="например: @durov или durov" autocomplete="off">
+                <button class="btn send-btn" id="saveUsernameBtn">✅ Сохранить</button>
+                <div class="warning-text">⚠️ Важно: получатель должен написать боту хотя бы одно сообщение (например /start), иначе сообщения не дойдут!</div>
+            `;
+            document.getElementById('saveUsernameBtn')?.addEventListener('click', () => {
+                let rawInput = document.getElementById('targetUserInput')?.value.trim();
+                if (!rawInput) {
+                    alert("Пожалуйста, введите username (например, @durov)");
+                    return;
+                }
+                // Форматируем: убираем лишние @ и добавляем один
+                let clean = rawInput.replace(/^@+/, "");
+                if (clean.length < 1) {
+                    alert("Некорректный username");
+                    return;
+                }
+                targetUsername = "@" + clean;
+                // Небольшая проверка: хотя бы не пустой
+                currentState = 'askWalk';
+                render();
+            });
+            return;
+        }
+        else if (currentState === 'askWalk') {
             root.innerHTML = `
                 <div class="big-question">❓ ты хочешь пойти гулять со мной? ❓</div>
                 <div class="button-group">
@@ -321,7 +370,7 @@
                 const place = document.getElementById('placeInput')?.value.trim();
                 if (!place) { alert("Напиши место :)"); return; }
                 savedPlace = place;
-                sendToTelegram(`📍 Место прогулки: ${place}`);
+                sendToTarget(`📍 Желаемое место прогулки: ${place}`);
                 currentState = 'calendarDatePick';
                 render();
             });
@@ -374,7 +423,7 @@
             `;
             document.getElementById('confirmYesBtn')?.addEventListener('click', () => {
                 selectedDateObj = tempSelectedDate;
-                sendToTelegram(`📅 Выбранная дата: ${selectedDateObj.full}`);
+                sendToTarget(`📅 Выбранная дата: ${selectedDateObj.full}`);
                 currentState = 'whatDoInput';
                 render();
             });
@@ -393,7 +442,7 @@
             document.getElementById('sendActivityBtn')?.addEventListener('click', () => {
                 const activity = document.getElementById('activityInput')?.value.trim();
                 if (!activity) { alert("Напиши, что планируем делать"); return; }
-                sendToTelegram(`🎉 Чем займёмся: ${activity} (Дата: ${selectedDateObj?.full || 'не указана'}, Место: ${savedPlace})`);
+                sendToTarget(`🎉 Чем займёмся: ${activity} (Дата: ${selectedDateObj?.full || 'не указана'}, Место: ${savedPlace})`);
                 currentState = 'finalThanks';
                 render();
             });
