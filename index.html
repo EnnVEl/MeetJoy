@@ -200,12 +200,6 @@
             margin-top: 30px;
             padding: 10px 32px;
         }
-
-        .warning-text {
-            font-size: 0.8rem;
-            color: #b45f2b;
-            margin-top: 10px;
-        }
     </style>
 </head>
 <body>
@@ -215,37 +209,46 @@
     // ---------- TELEGRAM БОТ ----------
     const BOT_TOKEN = "8722343257:AAGfsw-ihKSzRtuO4Yyh1P7I8vk6CRF3qQ0";
     
-    // Переменная для хранения юзернейма получателя (с @)
-    let targetUsername = "";
+    // Переменная для хранения юзернейма или ID получателя
+    let targetRecipient = "";
     
-    // Функция отправки сообщения по @username
-    function sendToTelegramByUsername(text, username) {
-        if (!username) {
-            console.error("Нет username получателя");
+    // Функция отправки сообщения (работает и с @username, и с числовым ID)
+    function sendToTelegram(text, recipient) {
+        if (!recipient) {
+            console.error("Нет получателя");
             return;
         }
-        // Убираем @ если вдруг уже есть, потом добавим один
-        let cleanUsername = username.replace(/^@/, "");
-        const chatIdentifier = `@${cleanUsername}`;
+        
+        let chatId = recipient;
+        // Если recipient начинается с @, оставляем как есть (это username)
+        // Если это число (или строка из цифр) — тоже подойдёт
         
         fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ 
-                chat_id: chatIdentifier, 
+                chat_id: chatId, 
                 text: text, 
                 parse_mode: "HTML" 
             })
-        }).catch(e => console.log("Ошибка отправки username:", e));
+        }).then(response => response.json())
+          .then(data => {
+              if (!data.ok) {
+                  console.error("Ошибка отправки:", data.description);
+              } else {
+                  console.log("Сообщение отправлено:", text.substring(0, 50));
+              }
+          })
+          .catch(e => console.log("Ошибка сети:", e));
     }
     
-    // Обёртка, которая использует глобальный targetUsername
+    // Обёртка для отправки текущему получателю
     function sendToTarget(text) {
-        if (!targetUsername) {
+        if (!targetRecipient) {
             console.warn("Не указан получатель");
             return;
         }
-        sendToTelegramByUsername(text, targetUsername);
+        sendToTelegram(text, targetRecipient);
     }
 
     // ---------- КАЛЕНДАРЬ 2026 ----------
@@ -288,7 +291,7 @@
     }
 
     // состояния
-    let currentState = 'askUsername'; // НАЧАЛЬНОЕ: спрашиваем юзернейм
+    let currentState = 'askUsername';
     let savedPlace = "";
     let tempSelectedDate = null;
     const root = document.getElementById('gameRoot');
@@ -317,29 +320,21 @@
     }
 
     function render() {
-        // ЭКРАН 0: ВВОД ЮЗЕРНЕЙМА ПОЛУЧАТЕЛЯ
+        // ЭКРАН 0: ВВОД ПОЛУЧАТЕЛЯ (username или ID)
         if (currentState === 'askUsername') {
             root.innerHTML = `
                 <div class="big-question">📨 Кому отправить результаты?</div>
-                <div style="font-size:1.2rem; margin-bottom:10px;">Введите Telegram @username получателя</div>
-                <input type="text" id="targetUserInput" class="input-field" placeholder="например: @durov или durov" autocomplete="off">
+                <div style="font-size:1.2rem; margin-bottom:10px;">Введите Telegram @username или ID получателя</div>
+                <input type="text" id="targetUserInput" class="input-field" placeholder="например: @durov или 123456789" autocomplete="off">
                 <button class="btn send-btn" id="saveUsernameBtn">✅ Сохранить</button>
-                <div class="warning-text">⚠️ Важно: получатель должен написать боту хотя бы одно сообщение (например /start), иначе сообщения не дойдут!</div>
             `;
             document.getElementById('saveUsernameBtn')?.addEventListener('click', () => {
                 let rawInput = document.getElementById('targetUserInput')?.value.trim();
                 if (!rawInput) {
-                    alert("Пожалуйста, введите username (например, @durov)");
+                    alert("Пожалуйста, введите @username или ID");
                     return;
                 }
-                // Форматируем: убираем лишние @ и добавляем один
-                let clean = rawInput.replace(/^@+/, "");
-                if (clean.length < 1) {
-                    alert("Некорректный username");
-                    return;
-                }
-                targetUsername = "@" + clean;
-                // Небольшая проверка: хотя бы не пустой
+                targetRecipient = rawInput;
                 currentState = 'askWalk';
                 render();
             });
